@@ -17,8 +17,8 @@ int _clock_gettime(clockid_t clk_id, struct timespec *res) {
 	return retval;
 }
 
-std::array<std::array<long long, m>, n> fingerprint(const std::function<size_t(size_t)>& fp_func, const std::string& out) {
-	std::array<std::array<long long, m>, n> fp;
+fingerprint make_fingerprint(const std::function<size_t(size_t)>& fp_func, const std::string& out) {
+	fingerprint fp;
 	for(int i = 1; i <= m; i++) {
 		for(int j = 1; j <= n; j++) {	
 			struct timespec startTime, endTime;
@@ -33,12 +33,22 @@ std::array<std::array<long long, m>, n> fingerprint(const std::function<size_t(s
 	if(out.empty())
 		return fp;
 
-	FILE *fout = fopen("fingerprint", "w");
+	FILE *fout = fopen(out.c_str(), "w");
 	for(int j = 0; j < n; j++) {
 		for(int i = 0; i < m; i++)
 			fprintf(fout, "%lld ", fp[j][i]);
 		fprintf(fout, "\n");
 	}
 	fclose(fout);
+	return fp;
+}
+
+fingerprint read_fingerprint(const std::string& in) {
+	fingerprint fp;
+	FILE *fin = fopen(in.c_str(), "r");
+	for(int i = 0; i < n; i++)
+		for(int j = 0; j < m; j++)
+			fscanf(fin, "%lld", &fp[i][j]);
+	fclose(fin);
 	return fp;
 }
