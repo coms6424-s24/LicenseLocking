@@ -1,5 +1,9 @@
 # LicenseLocking
 
+## Paper
+
+https://www.s3.eurecom.fr/docs/ccs18_iskander.pdf
+
 ## Example
 ```
 $ make
