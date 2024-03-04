@@ -82,7 +82,7 @@ bool match(fingerprint myfp, fingerprint base) {
 		long long x = mode(m_myfp[i]);
 		count += m_base[i].find(x) != m_base[i].end();
 		long long y = mode(m_base[i]);
-		count += m_myfp[i].find(y) != m_base[i].end();
+		count += m_myfp[i].find(y) != m_myfp[i].end();
 	}
 	printf("%d/%d\n", count, 2 * n);
 	return count >= threshold * 2 * n;
