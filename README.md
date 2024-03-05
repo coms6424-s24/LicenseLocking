@@ -9,8 +9,8 @@ https://www.s3.eurecom.fr/docs/ccs18_iskander.pdf
 $ make
 $ ./main
 usage: ./main <fingerprint_filename> [-cmp]
-$ ./main fingerprint
-$ ./main fingerprint -cmp
+$ ./main fingerprints/fingerprint_Andrei
+$ ./main fingerprints/fingerprint_Andrei -cmp
 1773/2000
 fingerprint match
 ```
