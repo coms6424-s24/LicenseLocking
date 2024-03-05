@@ -8,7 +8,18 @@
 #include "utils.h"
 
 typedef std::array<std::array<long long, m>, n> fingerprint;
+/*
+ * similarity threshold for fingerprint match
+ * or comparison
+ */
 constexpr double threshold = 0.5;
+/* 
+ * additional fingerprint entropy can be
+ * introduced by increasing the 'sensitivity'
+ * parameter. As a consequence, single machine
+ * measurements also become more unreliable.
+ */
+constexpr long long sensitivity = 1000;
 
 /*
  * fingerprints 'fp_func' according to the m, n

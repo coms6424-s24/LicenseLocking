@@ -18,15 +18,65 @@ int _clock_gettime(clockid_t clk_id, struct timespec *res) {
 	return retval;
 }
 
+/*
+ * Reads the Timestamp Counter (TSC); this should be
+ * the "CPU clock" mentioned in the paper
+ */
+inline uint64_t rdtsc() {
+	unsigned long a, d;
+	asm volatile ("mfence");
+	asm volatile ("rdtsc" : "=a" (a), "=d" (d));
+	asm volatile ("mfence");
+	return a | ((uint64_t)d << 32);
+}
+
 fingerprint make_fingerprint(const std::function<size_t(size_t)>& fp_func, const std::string& out) {
 	fingerprint fp;
 	for(int i = 1; i <= m; i++) {
-		for(int j = 1; j <= n; j++) {	
+		for(int j = 1; j <= n; j++) {
 			struct timespec startTime, endTime;
+			uint64_t startTSC, endTSC;
 			_clock_gettime(CLOCK_REALTIME, &startTime);
+			startTSC = rdtsc();
 			fp_func(j);
+			endTSC = rdtsc();
 			_clock_gettime(CLOCK_REALTIME, &endTime);
-			long long logTime = endTime.tv_nsec - startTime.tv_nsec;
+			/*
+             * CryptoFP is based on the "identification of readily 
+			 * available functions that, when repeated a sufficient 
+             * number of times, can be used to amplify the small 
+  			 * differences between different clocks" (page 2, section 1).
+			 * 
+			 * Two clocks available from user space are the TSC
+			 * (Timestamp Counter), which should be the clock "used
+			 * by the CPU to execute instructions", and the wall clock
+			 * which is different, has nanosecond resolution, and is
+			 * colocated with the CPU clock.
+			 * 
+			 * However, no reliable nanosecond-resolution clock is
+			 * made available from the TSC (which is measured in ticks)
+			 * and the wall clock is only shown in nanoseconds (not
+			 * in ticks). So, the TSC and wall clock are measured in 
+			 * different units, and conversion between them is
+			 * unreliable, especially with dynamic CPU frequency. 
+			 * 
+			 * My idea is, instead of trying to get the "difference"
+			 * between the clocks, like mentioned in the paper, to get
+			 * the quotient of those two measurements. This should 
+			 * cancel out any dynamic frequency factor or influence of
+			 * temperature (section 3.3.4), which affects both of them
+			 * equally. Similarly, the order in which the measurements
+			 * are made should not matter, since it only contributes
+			 * with a multiplicative factor to this quitoent.
+			 *
+			 * Indeed, this leads to reliable fingerprinting on a
+			 * single machine, even with different power settings,
+			 * which was NOT the case when using only one of the two
+			 * measurements (in that case, a lower frequency leads
+			 * to a proportional change in the fingerprint, which
+			 * compromises any similarity). 
+             */
+			long long logTime = sensitivity * (endTime.tv_nsec - startTime.tv_nsec) / (endTSC - startTSC);
 			fp[j - 1][i - 1] = logTime;
 		}
 	}
