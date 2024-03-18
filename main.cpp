@@ -17,10 +17,14 @@ int main(int argc, char **argv) {
     std::function<size_t(size_t)> fp_func = make_fp_func(method);
     fingerprint myfp = make_fingerprint(fp_func);
     fingerprint base = read_fingerprint(argv[1]);
-    if (match(myfp, base))
+    if (match(myfp, base)) {
       printf("fingerprint match\n");
-    else
+	  return 0;
+	}
+    else {
       printf("no match\n");
+	  return 1;
+	}
   } else {
     printf("usage: ./main <fingerprint_filename> [-cmp]\n");
     exit(1);
