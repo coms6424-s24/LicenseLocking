@@ -15,7 +15,12 @@ $ ./main fingerprints/fingerprint_Andrei -cmp
 fingerprint match
 ```
 
-## State
+## Testing
 
-So far, this has been tested on my (Andrei's) laptop runing Ubuntu Linux and a random GCP instance.
-The fingerprint was mostly stable on both machines, with no false positive matches observed.
+On my machine, the fingerprint, measured on the same operating system (Ubuntu 22.04.3 LTS), is stable
+across multiple (e.g. 20) measurements performed at random times within 14 days of fingerprint generation.
+The fingerprint stability is preserved between battery/charging modes and the three power modes (performance,
+balanced, power saving) provided by Ubuntu.
+
+GCP testing is currently limited to one GCP instance, with measurements at a short time horizon (i.e. minutes).
+The fingerprint is generally stable, although few runs lead to false negatives. No false positives observed.
