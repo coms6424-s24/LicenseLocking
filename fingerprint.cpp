@@ -39,10 +39,12 @@ fingerprint make_fingerprint(const std::function<size_t(size_t)> &fp_func,
       struct timespec startTime, endTime;
       uint64_t startTSC, endTSC;
       _clock_gettime(CLOCK_REALTIME, &startTime);
+      fp_func(j);
+      _clock_gettime(CLOCK_REALTIME, &endTime);
+
       startTSC = rdtsc();
       fp_func(j);
       endTSC = rdtsc();
-      _clock_gettime(CLOCK_REALTIME, &endTime);
       /*
        * CryptoFP is based on the "identification of readily
        * available functions that, when repeated a sufficient
@@ -53,23 +55,37 @@ fingerprint make_fingerprint(const std::function<size_t(size_t)> &fp_func,
        * (Timestamp Counter), which should be the clock "used
        * by the CPU to execute instructions", and the wall clock
        * which is different, has nanosecond resolution, and is
-       * colocated with the CPU clock.
+       * colocated with the CPU clock. Both of those clocks should
+	   * run at a fixed frequency, independent of the CPU freq.
        *
        * However, no reliable nanosecond-resolution clock is
        * made available from the TSC (which is measured in ticks)
        * and the wall clock is only shown in nanoseconds (not
        * in ticks). So, the TSC and wall clock are measured in
-       * different units, and conversion between them is
-       * unreliable, especially with dynamic CPU frequency.
+       * different units, and conversion between them may be
+       * unreliable.
+	   * IDEA: use TICKS_PER_SEC (?)
        *
        * My idea is, instead of trying to get the "difference"
        * between the clocks, like mentioned in the paper, to get
        * the quotient of those two measurements. This should
        * cancel out any dynamic frequency factor or influence of
        * temperature (section 3.3.4), which affects both of them
-       * equally. Similarly, the order in which the measurements
-       * are made should not matter, since it only contributes
-       * with a multiplicative factor to this quitoent.
+       * equally. 
+	   * NOTE: for some reason, the order in which the measurements
+       * are made matters. By this, I mean that code like 
+
+      	_clock_gettime(CLOCK_REALTIME, &startTime);
+      	startTSC = rdtsc();
+	    fp_func(j);
+      	endTSC = rdtsc();
+      	_clock_gettime(CLOCK_REALTIME, &endTime);
+
+       * will produce fingerprints dependent on the system load.
+	   * This is unexpected, since this order should only contribute
+	   * with a multiplicative factor to the quitoent. For this
+	   * reason, we currently take two measurements and time them
+	   * independently.
        *
        * Indeed, this leads to reliable fingerprinting on a
        * single machine, even with different power settings,
