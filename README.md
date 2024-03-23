@@ -23,9 +23,20 @@ is preserved between battery/charging modes, frequency-affecting power modes (pe
 and system load variations. Running the fingerprinting routine with CPU affinity under light load
 ```
 $ ./taskset_test.sh --fp=./fingerprints/fingerprint_Andrei_noload --test_count=1000 --stress=0
-<TODO>
+cpu 0: 4/1000 failed
+cpu 1: 4/1000 failed
+cpu 2: 3/1000 failed
+cpu 3: 4/1000 failed
+cpu 4: 2/1000 failed
+cpu 5: 4/1000 failed
+cpu 6: 6/1000 failed
+cpu 7: 2/1000 failed
+cpu 8: 0/1000 failed
+cpu 9: 2/1000 failed
+cpu 10: 0/1000 failed
+cpu 11: 5/1000 failed
 ```
-reveals ... and running under heavy load
+reveals a large probability (99.5%) of success, and running under heavy load
 ```
 $ ./taskset_test.sh --fp=./fingerprints/fingerprint_Andrei_noload --test_count=1000 --stress=1
 <TODO>
