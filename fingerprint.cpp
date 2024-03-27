@@ -2,6 +2,7 @@
 #include <immintrin.h>
 #include <map>
 #include <time.h>
+#include <numeric>
 
 #include "fingerprint.h"
 #include "utils.h"
@@ -18,6 +19,11 @@ int _clock_gettime(clockid_t clk_id, struct timespec *res) {
   _mm_mfence();
   return retval;
 }
+uint64_t clock_nsec() {
+	struct timespec T;
+	_clock_gettime(CLOCK_REALTIME, &T);
+	return T.tv_sec * 1000000000 + T.tv_nsec;
+}
 
 /*
  * Reads the Timestamp Counter (TSC); this should be
@@ -31,20 +37,40 @@ inline uint64_t rdtsc() {
   return a | ((uint64_t)d << 32);
 }
 
+// https://github.com/travisdowns/avx-turbo/blob/master/tsc-support.cpp
+constexpr uint64_t DELTA = 1000000;
+double sample() {
+	uint64_t startCLK, endCLK;
+    uint64_t startTSC, endTSC;
+    startCLK = clock_nsec();
+    startTSC = rdtsc();
+    while (startCLK + DELTA > (endCLK = clock_nsec()))
+		;
+    endTSC = rdtsc();
+    return 1.0 * (endCLK - startCLK) / (endTSC - startTSC);
+}
+
+constexpr size_t SAMPLES = 101;
+double ns_per_tick() {
+    std::array<double, SAMPLES * 2> samples;
+    for (size_t s = 0; s < SAMPLES * 2; s++)
+        samples[s] = sample();
+
+    // throw out the first half of samples as a warmup
+	std::sort(samples.begin() + SAMPLES, samples.end());
+    // average the middle quintile
+    double sum = std::accumulate(samples.begin() + SAMPLES + 2 * SAMPLES / 5, 
+								 samples.begin() + SAMPLES + 3 * SAMPLES / 5, 
+								 0.0);
+    return sum / (SAMPLES / 5);
+}
+
 fingerprint make_fingerprint(const std::function<size_t(size_t)> &fp_func,
                              const std::string &out) {
   fingerprint fp;
+  double mult = ns_per_tick();
   for (int i = 1; i <= m; i++) {
     for (int j = 1; j <= n; j++) {
-      struct timespec startTime, endTime;
-      uint64_t startTSC, endTSC;
-      _clock_gettime(CLOCK_REALTIME, &startTime);
-      fp_func(j);
-      _clock_gettime(CLOCK_REALTIME, &endTime);
-
-      startTSC = rdtsc();
-      fp_func(j);
-      endTSC = rdtsc();
       /*
        * CryptoFP is based on the "identification of readily
        * available functions that, when repeated a sufficient
@@ -94,8 +120,27 @@ fingerprint make_fingerprint(const std::function<size_t(size_t)> &fp_func,
        * to a proportional change in the fingerprint, which
        * compromises any similarity).
        */
-      long long logTime = sensitivity * (endTime.tv_nsec - startTime.tv_nsec) /
-                          (endTSC - startTSC);
+
+      /*struct timespec startTime, endTime;
+      uint64_t startTSC, endTSC;
+      _clock_gettime(CLOCK_REALTIME, &startTime);
+      fp_func(j);
+      _clock_gettime(CLOCK_REALTIME, &endTime);
+
+      startTSC = rdtsc();
+      fp_func(j);
+      endTSC = rdtsc();*/
+	  uint64_t startCLK, endCLK;
+	  uint64_t startTSC, endTSC;
+
+	  startCLK = clock_nsec();
+	  startTSC = rdtsc();
+      fp_func(j);
+	  endCLK = clock_nsec();
+	  endTSC = rdtsc();
+
+      long long logTime = sensitivity * 
+						  ((endCLK - startCLK) - mult * (endTSC - startTSC));
       fp[j - 1][i - 1] = logTime;
     }
   }

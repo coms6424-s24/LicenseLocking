@@ -19,7 +19,7 @@ constexpr double threshold = 0.5;
  * parameter. As a consequence, single machine
  * measurements also become more unreliable.
  */
-constexpr long long sensitivity = 1000;
+constexpr long long sensitivity = 8;
 
 /*
  * fingerprints 'fp_func' according to the m, n
