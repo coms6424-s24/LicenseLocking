@@ -14,7 +14,7 @@
  */
 int _clock_gettime(clockid_t clk_id, struct timespec *res) {
   _mm_mfence();
-  int retval = clock_gettime(CLOCK_REALTIME, res);
+  int retval = clock_gettime(clk_id, res);
   _mm_mfence();
   return retval;
 }
@@ -36,16 +36,16 @@ fingerprint make_fingerprint(const std::function<size_t(size_t)> &fp_func,
   fingerprint fp;
   for (int i = 1; i <= m; i++) {
     for (int j = 1; j <= n; j++) {
-      struct timespec startTime, endTime;
-      uint64_t startTSC, endTSC;
-      _clock_gettime(CLOCK_REALTIME, &startTime);
+      struct timespec startRTime, endRTime;
+      struct timespec startPTime, endPTime;
+      _clock_gettime(CLOCK_REALTIME, &startRTime);
+      _clock_gettime(CLOCK_REALTIME, &startPTime);
       fp_func(j);
-      _clock_gettime(CLOCK_REALTIME, &endTime);
+      _clock_gettime(CLOCK_REALTIME, &endRTime);
+      _clock_gettime(CLOCK_REALTIME, &endPTime);
 
-      startTSC = rdtsc();
-      fp_func(j);
-      endTSC = rdtsc();
       /*
+	   * OUTDATED: TODO change this
        * CryptoFP is based on the "identification of readily
        * available functions that, when repeated a sufficient
        * number of times, can be used to amplify the small
@@ -94,8 +94,8 @@ fingerprint make_fingerprint(const std::function<size_t(size_t)> &fp_func,
        * to a proportional change in the fingerprint, which
        * compromises any similarity).
        */
-      long long logTime = sensitivity * (endTime.tv_nsec - startTime.tv_nsec) /
-                          (endTSC - startTSC);
+      long long logTime = (endRTime.tv_nsec - startRTime.tv_nsec) -
+      					  (endPTime.tv_nsec - startPTime.tv_nsec);
       fp[j - 1][i - 1] = logTime;
     }
   }
