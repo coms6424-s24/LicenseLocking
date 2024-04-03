@@ -12,7 +12,7 @@ typedef std::array<std::array<long long, m>, n> fingerprint;
  * similarity threshold for fingerprint match
  * or comparison
  */
-constexpr double threshold = 0.5;
+constexpr double threshold = 0.75;
 /*
  * additional fingerprint entropy can be
  * introduced by increasing the 'sensitivity'

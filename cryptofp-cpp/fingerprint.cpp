@@ -39,10 +39,8 @@ fingerprint make_fingerprint(const std::function<size_t(size_t)> &fp_func,
       struct timespec startRTime, endRTime;
       struct timespec startPTime, endPTime;
       _clock_gettime(CLOCK_REALTIME, &startRTime);
-      _clock_gettime(CLOCK_REALTIME, &startPTime);
       fp_func(j);
       _clock_gettime(CLOCK_REALTIME, &endRTime);
-      _clock_gettime(CLOCK_REALTIME, &endPTime);
 
       /*
 	   * OUTDATED: TODO change this
@@ -94,8 +92,7 @@ fingerprint make_fingerprint(const std::function<size_t(size_t)> &fp_func,
        * to a proportional change in the fingerprint, which
        * compromises any similarity).
        */
-      long long logTime = (endRTime.tv_nsec - startRTime.tv_nsec) -
-      					  (endPTime.tv_nsec - startPTime.tv_nsec);
+      long long logTime = (endRTime.tv_nsec - startRTime.tv_nsec);
       fp[j - 1][i - 1] = logTime;
     }
   }

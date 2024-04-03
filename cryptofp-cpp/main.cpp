@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <unistd.h>
 
 #include "fingerprint.h"
 #include "fp_funcs.h"
@@ -15,16 +16,20 @@ int main(int argc, char **argv) {
     make_fingerprint(fp_func, argv[1]);
   } else if (argc == 3 && strcmp(argv[1], "-cmp") && !strcmp(argv[2], "-cmp")) {
     std::function<size_t(size_t)> fp_func = make_fp_func(method);
-    fingerprint myfp = make_fingerprint(fp_func);
     fingerprint base = read_fingerprint(argv[1]);
-    if (match(myfp, base)) {
-      printf("fingerprint match\n");
-	  return 0;
-	}
-    else {
-      printf("no match\n");
-	  return 1;
-	}
+
+    for (int i = 0; i < 5; i++) {
+      fingerprint myfp = make_fingerprint(fp_func);
+
+      if (match(myfp, base)) {
+        printf("fingerprint match\n");
+        return 0;
+      }
+      sleep(1);
+    }
+
+    printf("no match\n");
+    return 1;
   } else {
     printf("usage: ./main <fingerprint_filename> [-cmp]\n");
     exit(1);

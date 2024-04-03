@@ -2,6 +2,7 @@ import sys
 import time
 import datetime
 import timeit
+import random
 
 n = 1000
 m = 50
@@ -22,6 +23,7 @@ def make_fingerprint(file_name):
 			start_time = time.perf_counter_ns()
 			for k in range(j):
 				hash(j)
+			#random.randbytes(j)
 			end_time = time.perf_counter_ns()
 
 			log_time = end_time - start_time
