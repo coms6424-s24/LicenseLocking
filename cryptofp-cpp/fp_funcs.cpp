@@ -7,7 +7,7 @@
 #include "utils.h"
 
 // scale the size of the timed instances
-constexpr int scaling_factor = 10;
+constexpr int scaling_factor = 1;
 
 /*
  * Adapted from the Mozilla UNIX implementation of the

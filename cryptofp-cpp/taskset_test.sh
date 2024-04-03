@@ -28,7 +28,7 @@ done
 
 if [ $cntfp != "1" ] || [ $cnttc != "1" ] || [ $cntst != "1" ] || [ $cntel != "0" ]
 then
-	printf "usage: taskset_stress_test --fp=<fingerprint-path> --test_count=<number-of-iterations>\n"
+	printf "usage: taskset_stress_test --fp=<fingerprint-path> --test_count=<number-of-iterations> --stress=<0/1>\n"
 	exit 1
 fi
 
