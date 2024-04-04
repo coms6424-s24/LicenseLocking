@@ -11,6 +11,8 @@
 constexpr Method method = HASH;
 
 int main(int argc, char **argv) {
+  // Assign task to CPU0
+  // set_cpu(0);
   if (argc == 2 && strcmp(argv[1], "-cmp")) {
     std::function<size_t(size_t)> fp_func = make_fp_func(method);
     make_fingerprint(fp_func, argv[1]);

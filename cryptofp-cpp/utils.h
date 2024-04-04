@@ -7,4 +7,6 @@
 constexpr int n = 1000;
 constexpr int m = 50;
 
+void set_cpu(int cpu_id);
+
 #endif

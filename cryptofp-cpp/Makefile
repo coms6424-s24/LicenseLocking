@@ -9,9 +9,9 @@ CXXFLAGS = -g -Wall $(INCLUDES)
 LDFLAGS = -g
 LDLIBS =
 
-main: main.o fingerprint.o fp_funcs.o
+main: main.o fingerprint.o fp_funcs.o utils.o
 
-main.o: main.cpp fingerprint.h fp_funcs.h utils.h
+main.o: main.cpp utils.cpp fingerprint.h fp_funcs.h utils.h
 
 fp_funcs.o: fp_funcs.cpp fp_funcs.h utils.h
 

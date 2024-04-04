@@ -94,8 +94,13 @@ fingerprint make_fingerprint(const std::function<size_t(size_t)> &fp_func,
        * to a proportional change in the fingerprint, which
        * compromises any similarity).
        */
+
+	  /* Use quotient version when set tsc as clock source,
+	   * Use non-quotient version when set HPET as clock source.
+	   */
       long long logTime = sensitivity * (endTime.tv_nsec - startTime.tv_nsec) /
-                          (endTSC - startTSC);
+                      (endTSC - startTSC);
+	  //long long logTime = endTime.tv_nsec - startTime.tv_nsec;
       fp[j - 1][i - 1] = logTime;
     }
   }
