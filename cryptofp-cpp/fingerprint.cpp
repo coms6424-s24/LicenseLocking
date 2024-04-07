@@ -3,6 +3,8 @@
 #include <map>
 #include <time.h>
 
+#include <cassert>
+
 #include "fingerprint.h"
 #include "utils.h"
 
@@ -31,9 +33,58 @@ inline uint64_t rdtsc() {
   return a | ((uint64_t)d << 32);
 }
 
-fingerprint make_fingerprint(const std::function<size_t(size_t)> &fp_func,
-                             const std::string &out) {
-  fingerprint fp;
+typedef std::array<std::array<long long, m>, n> fingerprint;
+
+typedef std::vector<std::map<long long, int>> fingerprint_map;
+
+fingerprint_map to_map(const fingerprint& F) {
+  fingerprint_map M (n);
+  for (int i = 0; i < n; i++)
+    for (const long long& measurement : F[i])
+      M[i][measurement]++;
+  return M;
+}
+
+long long mode(const std::map<long long, int>& m) {
+  auto x = std::max_element(m.begin(), m.end(),
+                            [](const std::pair<long long, int> &p1,
+                               const std::pair<long long, int> &p2) {
+                              return p1.second < p2.second;
+                            });
+  return x->first;
+}
+
+fingerprint_hash to_hash(const fingerprint& F, Target t) {
+  fingerprint_hash H (2 * n * FINGERPRINT_HASH_LINE);
+  fingerprint_map M = to_map(F);
+  for (int i = 0; i < n; i++) {
+    long long md = mode(M[i]);
+	long long hm = (md % FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE) % FINGERPRINT_HASH_LINE;
+	if(t == BASE) {
+		H[i * 2 * FINGERPRINT_HASH_LINE + hm] = 1;
+		for(int j = 0; j < m; j++) {
+			long long x = F[i][j];
+			long long hx = (x % FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE) % FINGERPRINT_HASH_LINE;
+			H[i * 2 * FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE + hx] = 1;
+		}
+	}
+	else {
+		H[i * 2 * FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE + hm] = 1;
+		for(int j = 0; j < m; j++) {
+			long long x = F[i][j];
+			long long hx = (x % FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE) % FINGERPRINT_HASH_LINE;
+			H[i * 2 * FINGERPRINT_HASH_LINE + hx] = 1;
+		}
+	}
+  }
+
+  return H;
+}
+
+
+fingerprint_hash make_hash(const std::function<size_t(size_t)>& fp_func,
+                   		   const Target& t, const std::string &out) {
+  fingerprint F;
   for (int i = 1; i <= m; i++) {
     for (int j = 1; j <= n; j++) {
 	  struct timespec startTime, endTime;
@@ -100,63 +151,34 @@ fingerprint make_fingerprint(const std::function<size_t(size_t)> &fp_func,
 	   */
       long long logTime = sensitivity * (endTime.tv_nsec - startTime.tv_nsec) /
                       (endTSC - startTSC);
-	  //long long logTime = endTime.tv_nsec - startTime.tv_nsec;
-      fp[j - 1][i - 1] = logTime;
+      F[j - 1][i - 1] = logTime;
     }
   }
 
+  fingerprint_hash H = to_hash(F, t);
   if (out.empty())
-    return fp;
+    return H;
 
   FILE *fout = fopen(out.c_str(), "w");
-  for (int j = 0; j < n; j++) {
-    for (int i = 0; i < m; i++)
-      fprintf(fout, "%lld ", fp[j][i]);
-    fprintf(fout, "\n");
-  }
+  for(int i = 0; i < 2 * n * FINGERPRINT_HASH_LINE; i++)
+	fprintf(fout, "%lld ", H[i]);
   fclose(fout);
-  return fp;
+  return H;
 }
 
-fingerprint read_fingerprint(const std::string &in) {
-  fingerprint fp;
+fingerprint_hash read_hash(const std::string &in) {
+  fingerprint_hash H (2 * n * FINGERPRINT_HASH_LINE);
   FILE *fin = fopen(in.c_str(), "r");
-  for (int i = 0; i < n; i++)
-    for (int j = 0; j < m; j++)
-      fscanf(fin, "%lld", &fp[i][j]);
+  for(int i = 0; i < 2 * n * FINGERPRINT_HASH_LINE; i++)
+    fscanf(fin, "%lld", &H[i]);
   fclose(fin);
-  return fp;
+  return H;
 }
 
-typedef std::array<std::map<long long, int>, n> m_fingerprint;
-m_fingerprint to_map(fingerprint fp) {
-  m_fingerprint m_fp;
-  for (int i = 0; i < n; i++)
-    for (const long long &measurement : fp[i])
-      m_fp[i][measurement]++;
-  return m_fp;
-}
-
-long long mode(std::map<long long, int> m) {
-  auto x = std::max_element(m.begin(), m.end(),
-                            [](const std::pair<long long, int> &p1,
-                               const std::pair<long long, int> &p2) {
-                              return p1.second < p2.second;
-                            });
-  return x->first;
-}
-
-bool match(fingerprint myfp, fingerprint base) {
-  m_fingerprint m_myfp = to_map(myfp);
-  m_fingerprint m_base = to_map(base);
-
-  int count = 0;
-  for (int i = 0; i < n; i++) {
-    long long x = mode(m_myfp[i]);
-    count += m_base[i].find(x) != m_base[i].end();
-    long long y = mode(m_base[i]);
-    count += m_myfp[i].find(y) != m_myfp[i].end();
-  }
-  printf("%d/%d\n", count, 2 * n);
-  return count >= threshold * 2 * n;
+bool match_hash(const fingerprint_hash& myH, const fingerprint_hash& baseH) {
+	int count = 0;
+	for(int i = 0; i < 2 * n * FINGERPRINT_HASH_LINE; i++)
+		count += myH[i] * baseH[i];
+	printf("%d/%d\n", count, 2 * n);
+	return count >= threshold * 2 * n;
 }
