@@ -60,21 +60,11 @@ fingerprint_hash to_hash(const fingerprint& F, Target t) {
   for (int i = 0; i < n; i++) {
     long long md = mode(M[i]);
 	long long hm = (md % FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE) % FINGERPRINT_HASH_LINE;
-	if(t == BASE) {
-		H[i * 2 * FINGERPRINT_HASH_LINE + hm] = 1;
-		for(int j = 0; j < m; j++) {
-			long long x = F[i][j];
-			long long hx = (x % FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE) % FINGERPRINT_HASH_LINE;
-			H[i * 2 * FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE + hx] = 1;
-		}
-	}
-	else {
-		H[i * 2 * FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE + hm] = 1;
-		for(int j = 0; j < m; j++) {
-			long long x = F[i][j];
-			long long hx = (x % FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE) % FINGERPRINT_HASH_LINE;
-			H[i * 2 * FINGERPRINT_HASH_LINE + hx] = 1;
-		}
+	H[(i * 2 + t) * FINGERPRINT_HASH_LINE + hm] = 1;
+	for(int j = 0; j < m; j++) {
+		long long x = F[i][j];
+		long long hx = (x % FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE) % FINGERPRINT_HASH_LINE;
+		H[(i * 2 + 1 - t) * FINGERPRINT_HASH_LINE + hx] = 1;
 	}
   }
 
