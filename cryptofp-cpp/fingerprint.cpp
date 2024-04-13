@@ -35,10 +35,23 @@ inline uint64_t rdtsc() {
   return a | ((uint64_t)d << 32);
 }
 
+/*
+ * This type represents the raw fingerprint type defined in the
+ * paper (i.e. 2-dimensiona array of clock-related measurements)
+ */
 typedef std::array<std::array<long long, m>, n> fingerprint;
 
+/*
+ * This type stores every row of the original (raw) fingerprint
+ * as an std::map, for easy identification of the mode (and, if
+ * needed, for easy set-membership checks; however, I might
+ * deprecate this soon).
+ */
 typedef std::vector<std::map<long long, int>> fingerprint_map;
 
+/*
+ * to_map : fingerprint -> fingerprint_map
+ */
 fingerprint_map to_map(const fingerprint& F) {
   fingerprint_map M (n);
   for (int i = 0; i < n; i++)
@@ -56,6 +69,9 @@ long long mode(const std::map<long long, int>& m) {
   return x->first;
 }
 
+/*
+ * to_hash : fingerprint -> fingerprint_hash
+ */
 fingerprint_hash to_hash(const fingerprint& F) {
   /* 
    * Fingerprint matching, in the original paper, is posed
@@ -114,11 +130,14 @@ fingerprint_hash to_hash(const fingerprint& F) {
 	auto hash_func = [&c, &p](long long x) {
 		long long acc = 0;
 		x %= p;
+		// Horner's Method of evaluating polynomials
 		for(int i = 0; i < m; i++)
 			acc = (acc * x + c[i]) % p;
 		return acc >= 0 ? acc : acc + p;
 	};
-
+	
+	// add regular elements with weight 1 and modes with a
+	// predefined, large weight (discussed above)
 	for(int j = 0; j < m; j++) {
 		long long x = F[i][j];
 		long long hx = hash_func(x) % FINGERPRINT_HASH_LINE;
@@ -132,7 +151,11 @@ fingerprint_hash to_hash(const fingerprint& F) {
   return H;
 }
 
-
+/*
+ * Generates the fingerprint (by timing fp_func repeatedly) and returns
+ * it as a fingerprint_hash; if non-empty, out is the filename where the
+ * fingerprint is dumped.
+ */
 fingerprint_hash make_hash(const std::function<size_t(size_t)>& fp_func,
                    		   const std::string &out) {
   fingerprint F;
