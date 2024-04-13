@@ -7,7 +7,7 @@
 #include <cassert>
 
 #include "fingerprint.h"
-#include "prng.h"
+#include "PRNG/prng.h"
 #include "utils.h"
 
 /*
