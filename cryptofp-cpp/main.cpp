@@ -15,10 +15,10 @@ int main(int argc, char **argv) {
   // set_cpu(0);
   if (argc == 2 && strcmp(argv[1], "-cmp")) {
     std::function<size_t(size_t)> fp_func = make_fp_func(method);
-    make_hash(fp_func, BASE, argv[1]);
+    make_hash(fp_func, argv[1]);
   } else if (argc == 3 && strcmp(argv[1], "-cmp") && !strcmp(argv[2], "-cmp")) {
 	std::function<size_t(size_t)> fp_func = make_fp_func(method);
-	fingerprint_hash Hmine = make_hash(fp_func, VAR);
+	fingerprint_hash Hmine = make_hash(fp_func);
     fingerprint_hash Hbase = read_hash(argv[1]);
 
     if (match_hash(Hmine, Hbase)) {

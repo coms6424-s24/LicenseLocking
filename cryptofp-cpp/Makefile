@@ -12,13 +12,15 @@ LDLIBS =
 .PHONY: all
 executables: main example
 
-main: main.o fingerprint.o fp_funcs.o utils.o
+main: main.o fingerprint.o fp_funcs.o utils.o prng.o
 
 main.o: main.cpp utils.cpp fingerprint.h fp_funcs.h utils.h
 
 fp_funcs.o: fp_funcs.cpp fp_funcs.h utils.h
 
-fingerprint.o: fingerprint.cpp fingerprint.h utils.h
+fingerprint.o: fingerprint.cpp fingerprint.h utils.h prng.h
+
+prng.o: prng.c
 
 example: example.c
 	gcc example.c -o example -lgmp -lcifer

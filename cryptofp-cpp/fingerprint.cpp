@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cassert>
 #include <immintrin.h>
 #include <map>
 #include <time.h>
@@ -6,6 +7,7 @@
 #include <cassert>
 
 #include "fingerprint.h"
+#include "prng.h"
 #include "utils.h"
 
 /*
@@ -54,18 +56,67 @@ long long mode(const std::map<long long, int>& m) {
   return x->first;
 }
 
-fingerprint_hash to_hash(const fingerprint& F, Target t) {
-  fingerprint_hash H (2 * n * FINGERPRINT_HASH_LINE);
+fingerprint_hash to_hash(const fingerprint& F) {
+  /* 
+   * Fingerprint matching, in the original paper, is posed
+   * in terms of set membership (i.e. mode(fp1[i]) in fp2[i]
+   * and mode(fp2[i]) in fp1[i]). In this implementation, we 
+   * express set membership as a dot product:
+   *     1) For all i = 1...n, hash the measurements fp[i]
+   *        to some range [0, FINGERPRINT_HASH_LINE]. The
+   *        hash is selected randomly from a 2-uniform hash
+   *        family and need not be cryptographically safe.
+   *     2) All cells containing a measurement contain value
+   *        1, and the cell containing the mode is set to
+   *        MODE_WEIGHT.
+   *     3) If we dot product 2 hash tables, we have 3 types
+   *        of non-zero contributions:
+   *            a) 1 * 1 -> false collision, at most m per
+   *               hash line, n * m overall
+   *            b) 1 * MODE_WEIGHT -> true collision, 1 mode
+   *               is in the opposite hash table (assuming
+   *               perfect hashing; assumption discussed later)
+   *            c) MODE_WEIGHT * MODE_WEIGHT -> two true 
+   *               collisions, both modes in the opposite hashes
+   * MODE_WEIGHT is set so that the three types of collisions
+   * have different orders of magnitude and can be distinguished
+   * from each other.
+   */
+  assert(MODE_WEIGHT > m * n);
+  /* 
+   * Seed PRNG with deterministic seed (for reproducible
+   * hash function instantiations across multiple fingerprints.
+   * This could be randomized and stored in a file in the
+   * future if desired.
+   */
+  long long seed = 8009488488;
+  prng_seed_bytes(&seed, sizeof(seed));
+  /* 
+   * [Carter, Wegman] set p to be a prime greater than any
+   * measurement. Assuming all measurements are an order of
+   * magnitude shorter than the  within the window of one 
+   * context switch (0.1 ms = 1e8 ns), this p should be fine.
+   */
+  long long p = 100000007;
+
+  fingerprint_hash H (n * FINGERPRINT_HASH_LINE);
   fingerprint_map M = to_map(F);
   for (int i = 0; i < n; i++) {
-    long long md = mode(M[i]);
-	long long hm = (md % FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE) % FINGERPRINT_HASH_LINE;
-	H[(i * 2 + t) * FINGERPRINT_HASH_LINE + hm] = 1;
+	// [Carter, Wegman], 2-universal hash function
+	long long a, b;
+	prng_get_bytes(&a, sizeof(long long));
+	prng_get_bytes(&b, sizeof(long long));
+	a = (a % p + p) % p;
+	b = (b % p + p) % p;
+
 	for(int j = 0; j < m; j++) {
 		long long x = F[i][j];
-		long long hx = (x % FINGERPRINT_HASH_LINE + FINGERPRINT_HASH_LINE) % FINGERPRINT_HASH_LINE;
-		H[(i * 2 + 1 - t) * FINGERPRINT_HASH_LINE + hx] = 1;
+		long long hx = ((a * x + b) % p) % FINGERPRINT_HASH_LINE;
+		H[i * FINGERPRINT_HASH_LINE + hx] = 1;
 	}
+    long long md = mode(M[i]);
+	long long hm = ((a * md + b) % p) % FINGERPRINT_HASH_LINE;
+	H[i * FINGERPRINT_HASH_LINE + hm] = MODE_WEIGHT;
   }
 
   return H;
@@ -73,7 +124,7 @@ fingerprint_hash to_hash(const fingerprint& F, Target t) {
 
 
 fingerprint_hash make_hash(const std::function<size_t(size_t)>& fp_func,
-                   		   const Target& t, const std::string &out) {
+                   		   const std::string &out) {
   fingerprint F;
   for (int i = 1; i <= m; i++) {
     for (int j = 1; j <= n; j++) {
@@ -86,89 +137,48 @@ fingerprint_hash make_hash(const std::function<size_t(size_t)>& fp_func,
       startTSC = rdtsc();
       fp_func(j);
       endTSC = rdtsc();
-      /*
-       * CryptoFP is based on the "identification of readily
-       * available functions that, when repeated a sufficient
-       * number of times, can be used to amplify the small
-       * differences between different clocks" (page 2, section 1).
-       *
-       * Two clocks available from user space are the TSC
-       * (Timestamp Counter), which should be the clock "used
-       * by the CPU to execute instructions", and the wall clock
-       * which is different, has nanosecond resolution, and is
-       * colocated with the CPU clock. Both of those clocks should
-	   * run at a fixed frequency, independent of the CPU freq.
-       *
-       * However, no reliable nanosecond-resolution clock is
-       * made available from the TSC (which is measured in ticks)
-       * and the wall clock is only shown in nanoseconds (not
-       * in ticks). So, the TSC and wall clock are measured in
-       * different units, and conversion between them may be
-       * unreliable.
-	   * IDEA: use TICKS_PER_SEC (?)
-       *
-       * My idea is, instead of trying to get the "difference"
-       * between the clocks, like mentioned in the paper, to get
-       * the quotient of those two measurements. This should
-       * cancel out any dynamic frequency factor or influence of
-       * temperature (section 3.3.4), which affects both of them
-       * equally. 
-	   * NOTE: for some reason, the order in which the measurements
-       * are made matters. By this, I mean that code like 
-
-      	_clock_gettime(CLOCK_REALTIME, &startTime);
-      	startTSC = rdtsc();
-	    fp_func(j);
-      	endTSC = rdtsc();
-      	_clock_gettime(CLOCK_REALTIME, &endTime);
-
-       * will produce fingerprints dependent on the system load.
-	   * This is unexpected, since this order should only contribute
-	   * with a multiplicative factor to the quitoent. For this
-	   * reason, we currently take two measurements and time them
-	   * independently.
-       *
-       * Indeed, this leads to reliable fingerprinting on a
-       * single machine, even with different power settings,
-       * which was NOT the case when using only one of the two
-       * measurements (in that case, a lower frequency leads
-       * to a proportional change in the fingerprint, which
-       * compromises any similarity).
-       */
 
 	  /* Use quotient version when set tsc as clock source,
 	   * Use non-quotient version when set HPET as clock source.
 	   */
-      long long logTime = sensitivity * (endTime.tv_nsec - startTime.tv_nsec) /
+	  long long logTime;
+	  if (CLOCKSOURCE == TSC)
+        logTime = sensitivity * (endTime.tv_nsec - startTime.tv_nsec) /
                       (endTSC - startTSC);
+	  else if (CLOCKSOURCE == HPET)
+	    logTime = endTime.tv_nsec - startTime.tv_nsec;
       F[j - 1][i - 1] = logTime;
     }
   }
 
-  fingerprint_hash H = to_hash(F, t);
+  fingerprint_hash H = to_hash(F);
   if (out.empty())
     return H;
 
   FILE *fout = fopen(out.c_str(), "w");
-  for(int i = 0; i < 2 * n * FINGERPRINT_HASH_LINE; i++)
+  for(int i = 0; i < n * FINGERPRINT_HASH_LINE; i++)
 	fprintf(fout, "%lld ", H[i]);
   fclose(fout);
   return H;
 }
 
 fingerprint_hash read_hash(const std::string &in) {
-  fingerprint_hash H (2 * n * FINGERPRINT_HASH_LINE);
+  fingerprint_hash H (n * FINGERPRINT_HASH_LINE);
   FILE *fin = fopen(in.c_str(), "r");
-  for(int i = 0; i < 2 * n * FINGERPRINT_HASH_LINE; i++)
+  for(int i = 0; i < n * FINGERPRINT_HASH_LINE; i++)
     fscanf(fin, "%lld", &H[i]);
   fclose(fin);
   return H;
 }
 
 bool match_hash(const fingerprint_hash& myH, const fingerprint_hash& baseH) {
-	int count = 0;
-	for(int i = 0; i < 2 * n * FINGERPRINT_HASH_LINE; i++)
-		count += myH[i] * baseH[i];
-	printf("%d/%d\n", count, 2 * n);
-	return count >= threshold * 2 * n;
+	long long dp = 0LL;
+	for(int i = 0; i < n * FINGERPRINT_HASH_LINE; i++)
+		dp += myH[i] * baseH[i];
+	// distinguish between the three types of collisions
+	long long count = 2LL * (dp / (MODE_WEIGHT * MODE_WEIGHT)) + 
+                      1LL * (dp % (MODE_WEIGHT * MODE_WEIGHT) / MODE_WEIGHT) + 
+                      0LL * (dp % MODE_WEIGHT);
+	printf("%lld/%lld\n", count, 2LL * n);
+	return count >= threshold * 2LL * n;
 }

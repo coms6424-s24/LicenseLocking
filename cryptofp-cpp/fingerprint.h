@@ -7,7 +7,11 @@
 
 #include "utils.h"
 
-constexpr int FINGERPRINT_HASH_LINE = m * m;
+enum Clocksource { TSC, HPET };
+constexpr Clocksource CLOCKSOURCE = TSC;
+
+constexpr long long MODE_WEIGHT = (1 << 16); // must be larger than m * n
+constexpr int FINGERPRINT_HASH_LINE = 10 * m;
 typedef std::vector<long long> fingerprint_hash;
 
 /*
@@ -23,7 +27,6 @@ constexpr double threshold = 0.5;
  */
 constexpr long long sensitivity = 1000;
 
-enum Target { BASE, VAR };
 /*
  * fingerprints 'fp_func' according to the m, n
  * parameters set in 'utils.h'. Returns the fp
@@ -31,7 +34,7 @@ enum Target { BASE, VAR };
  * prints the fingerprint in the file 'out'.
  */
 fingerprint_hash make_hash(const std::function<size_t(size_t)> &fp_func,
-                           const Target& t, const std::string &out = "");
+                           const std::string &out = "");
 
 /*
  * reads and returns a fingerprint from 'in'.
