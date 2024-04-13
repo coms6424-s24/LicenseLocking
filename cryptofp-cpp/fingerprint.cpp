@@ -64,7 +64,7 @@ fingerprint_hash to_hash(const fingerprint& F) {
    * express set membership as a dot product:
    *     1) For all i = 1...n, hash the measurements fp[i]
    *        to some range [0, FINGERPRINT_HASH_LINE]. The
-   *        hash is selected randomly from a 2-uniform hash
+   *        hash is selected randomly from a m-independent hash
    *        family and need not be cryptographically safe.
    *     2) All cells containing a measurement contain value
    *        1, and the cell containing the mode is set to
@@ -102,20 +102,30 @@ fingerprint_hash to_hash(const fingerprint& F) {
   fingerprint_hash H (n * FINGERPRINT_HASH_LINE);
   fingerprint_map M = to_map(F);
   for (int i = 0; i < n; i++) {
-	// [Carter, Wegman], 2-universal hash function
-	long long a, b;
-	prng_get_bytes(&a, sizeof(long long));
-	prng_get_bytes(&b, sizeof(long long));
-	a = (a % p + p) % p;
-	b = (b % p + p) % p;
+	// [Carter, Wegman], m-wise independent hash function:
+	// Evaluate a polynomial with random coefficients in
+	// Zp (given the large p chosen above), then map that
+	// to the desired range
+	long long c[m];
+	for(int i = 0; i < m; i++) {
+		prng_get_bytes(c + i, sizeof(long long));
+		c[i] %= p;
+	}
+	auto hash_func = [&c, &p](long long x) {
+		long long acc = 0;
+		x %= p;
+		for(int i = 0; i < m; i++)
+			acc = (acc * x + c[i]) % p;
+		return acc >= 0 ? acc : acc + p;
+	};
 
 	for(int j = 0; j < m; j++) {
 		long long x = F[i][j];
-		long long hx = ((a * x + b) % p) % FINGERPRINT_HASH_LINE;
+		long long hx = hash_func(x) % FINGERPRINT_HASH_LINE;
 		H[i * FINGERPRINT_HASH_LINE + hx] = 1;
 	}
     long long md = mode(M[i]);
-	long long hm = ((a * md + b) % p) % FINGERPRINT_HASH_LINE;
+	long long hm = hash_func(md) % FINGERPRINT_HASH_LINE;
 	H[i * FINGERPRINT_HASH_LINE + hm] = MODE_WEIGHT;
   }
 
