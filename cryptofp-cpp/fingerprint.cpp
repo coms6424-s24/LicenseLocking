@@ -1,10 +1,9 @@
 #include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <ctime>
 #include <immintrin.h>
 #include <map>
-#include <time.h>
-
-#include <cassert>
 
 #include "fingerprint.h"
 #include "PRNG/prng.h"
@@ -58,6 +57,22 @@ fingerprint_map to_map(const fingerprint& F) {
     for (const long long& measurement : F[i])
       M[i][measurement]++;
   return M;
+}
+
+/*
+ * Pads each row of a fingerprint with random values until each
+ * row has exactly m distinct elements; helps with correcting
+ * the collision bias.
+ */ 
+void pad(fingerprint_map& M) {
+	for(int i = 0; i < n; i++) {
+		long long dummy = 0;
+		while(M[i].size() < m) {
+			if(M[i].find(dummy) == M[i].end())
+				M[i][dummy] = 1;
+			dummy++;
+		}
+	}
 }
 
 long long mode(const std::map<long long, int>& m) {
@@ -117,6 +132,7 @@ fingerprint_hash to_hash(const fingerprint& F) {
 
   fingerprint_hash H (n * FINGERPRINT_HASH_LINE);
   fingerprint_map M = to_map(F);
+  pad(M);
   for (int i = 0; i < n; i++) {
 	// [Carter, Wegman], m-wise independent hash function:
 	// Evaluate a polynomial with random coefficients in
@@ -212,6 +228,36 @@ bool match_hash(const fingerprint_hash& myH, const fingerprint_hash& baseH) {
 	long long count = 2LL * (dp / (MODE_WEIGHT * MODE_WEIGHT)) + 
                       1LL * (dp % (MODE_WEIGHT * MODE_WEIGHT) / MODE_WEIGHT) + 
                       0LL * (dp % MODE_WEIGHT);
-	printf("%lld/%lld\n", count, 2LL * n);
-	return count >= threshold * 2LL * n;
+	/* count includes false collisions from hashing to a small domain
+	 * a true  positive set-membership result is always counted
+	 * a false positive set-membership occurs with probability
+	 *
+	 *          fp = 1 - (1 - 1/FINGERPRINT_HASH_LINE)^m
+     *
+     * (by m-wise independence of hash family and map padding)
+	 * So, if X is the real match rate,
+	 *
+	 *          E[count] = X + (2 * n - X) * fp
+	 *        Var[count] = (2 * n - X) * fp * (1 - fp)
+	 *
+     * (by properties of the binomial distribution). So, an unbiased
+	 * estimator of X is
+     * 
+	 *         Xhat := (count - 2 * n * fp) / (1 - fp)
+	 * 		 E[Xhat] = X
+     *     Var[Xhat] = (2 * n - X) * fp / (1 - fp) <= 2 * n * fp / (1 - fp)
+	 * 
+     * For reference, if n = 1000 and m = 50, fp = 0.095, var = 210, std = 14.5.
+     * So, with high probability,
+     * 
+     *         X - 3 * std <= Xhat <= X + 3 * std
+     *         X - 43.5    <= Xhat <= X + 43.5
+	 * 
+     * Which is pretty good :)
+     */
+	double fp = 1.0 - pow(1.0 - 1.0 / FINGERPRINT_HASH_LINE, m);
+	long long Xhat = (count - 2 * n * fp) / (1 - fp);
+	long long std = (long long) sqrt(2 * n * fp / (1 - fp));
+	printf("%lld (+- %lld)/%lld\n", Xhat, 3 * std, 2LL * n);
+	return Xhat >= threshold * 2LL * n;
 }
