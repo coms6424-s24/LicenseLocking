@@ -4,16 +4,54 @@
 
 https://www.s3.eurecom.fr/docs/ccs18_iskander.pdf
 
-## Example
+## Building and Example Usage
+To build and run the fingerprinting program, run
 ```
+$ ./build.sh
 $ make
 $ ./main
 usage: ./main <fingerprint_filename> [-cmp]
-$ ./main fingerprints/fingerprint_Andrei_noload
-$ ./main fingerprints/fingerprint_Andrei_noload -cmp
-1773/2000
+$ time ./main ../fingerprints/fingerprint_Andrei_noload
+real	5m41.165s
+user	5m40.063s
+sys	0m0.705s
+$ time ./main ../fingerprints/fingerprint_Andrei_noload -cmp
+1298 (+42 -66)/2000
 fingerprint match
+real	0m2.335s
+user	0m2.091s
+sys	0m0.244s
 ```
+
+## Configuration Changes
+The fingerprinting clocksource can be configured via the CLOCKSOURCE variable
+```
+enum Clocksource { TSC,
+    HPET };
+constexpr Clocksource CLOCKSOURCE = TSC;
+```
+in `fingerprint.h` to either TSC or HPET. In TSC mode, the implementation attempts to measure the quotient of two TSC-related measurements. In HPET mode, absolute HPET-related measurements are used.
+Also in `fingerprint.h` are
+```
+constexpr double threshold = 0.5;
+constexpr long long sensitivity = 1000;
+```
+which control the fingerprint-similarity threshold and size of the measured subproblems respectively. For a more detailed description, see the header file.
+
+The size of the fingerprinting matrix (i.e. number of measurements and repeats) is controlled from `utils.h`:
+```
+constexpr int n = 1000;
+constexpr int m = 50;
+```
+These parameters are taken from the paper. I recommend AGAINST modifying these parameters if using encryption. If you must modify them, however, please look at the `FINGERPRINT_HASH_LINE` constant as well, and be mindful of the linear increase in encryption time with the number of measurements. Increasing that constant leads to a blow-up in memory usage too. Whether or not encryption is used for the fingerprints is decided within `crypto.h`:
+```
+constexpr bool ENCRYPT = true;
+```
+For testing different fingerprinting methods and their respective accuracies, I recommend setting this flag to `false`. Otherwise, the base fingerprint takes several minutes.
+
+## Encryption
+
+At a very high level, the fingerprints are embedded into a different space (each row is hashed with a function from an m-wise independent hash family, into a slightly larger hash table; think of a Bloom Filter with 1 function; different weights are applied to different elements, to give meaning to the dot product of two hashes), where fingerprint similarity is closely related to the dot-product. These embeddings are encrypted using FHIPE (Function Hiding Inner-Product Encryption), which allows us to recover the dot-product from encrypted data without leaking more information. This dot-product is then interpreted into a similarity score. This score is biased (because of collisions introduced by the original embedding), so bias-correction is applied. Encryption uses the CiFEr library (installed by the `build.sh` script).
 
 ## Testing
 
