@@ -47,7 +47,7 @@ void write_encrypted_hash(const fingerprint_hash& H, const std::string& out);
  * Computes the dot product of two hashed fingerprints. This relates to
  * section 3.3.2 and Figure 2 of the original paper. However, notably,
  * the similarity of two hashed fingerprints is expressed in terms of
- * their dot product.
+ * the dot product of their hashes.
  */
 long long dot_hash(const fingerprint_hash& myH, const fingerprint_hash& baseH);
 long long dot_hash_encrypted(const fingerprint_hash& myH, const std::string& baseHpath);
