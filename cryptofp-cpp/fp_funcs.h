@@ -4,11 +4,12 @@
 #include <functional>
 #include <stddef.h>
 
-enum Method { RAND, HASH };
+enum Method { RAND,
+    HASH };
 
 /*
  * Creates a function to be fingerprinted
  */
-std::function<size_t(size_t)> make_fp_func(const Method &method);
+std::function<size_t(size_t)> make_fp_func(const Method& method);
 
 #endif
