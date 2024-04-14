@@ -121,7 +121,7 @@ fingerprint_hash to_hash(const fingerprint& F)
      * have different orders of magnitude and can be distinguished
      * from each other.
      */
-    assert(MODE_WEIGHT > m * n);
+    assert(MODE_WEIGHT > 2 * n);
     /*
      * Seed PRNG with deterministic seed (for reproducible
      * hash function instantiations across multiple fingerprints.
@@ -350,6 +350,6 @@ bool match(long long dp)
     double fp = 1.0 - pow(1.0 - 1.0 / FINGERPRINT_HASH_LINE, m);
     long long Xhat = (count - 2 * n * fp) / (1 - fp);
     long long std = (long long)sqrt(2 * n * fp / (1 - fp));
-    printf("%lld (+- %lld)/%lld\n", Xhat, 3 * std, 2LL * n);
+    printf("%lld (+%lld -%lld)/%lld\n", Xhat, 3 * std, 3 * std + (m * n / MODE_WEIGHT), 2LL * n);
     return Xhat >= threshold * 2LL * n;
 }

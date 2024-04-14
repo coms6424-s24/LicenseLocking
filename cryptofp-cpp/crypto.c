@@ -154,7 +154,7 @@ void init_scheme(cfe_ddh* s, size_t len)
     mpz_t bound;
     mpz_inits(bound, NULL);
     mpz_set_ui(bound, 2);
-    mpz_pow_ui(bound, bound, 16);
+    mpz_pow_ui(bound, bound, 11);
     // bit length of prime modulus p
     int modulus_len = 1024;
 

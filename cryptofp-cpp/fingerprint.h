@@ -11,7 +11,7 @@ enum Clocksource { TSC,
     HPET };
 constexpr Clocksource CLOCKSOURCE = TSC;
 
-constexpr long long MODE_WEIGHT = (1 << 16); // must be larger than m * n
+constexpr long long MODE_WEIGHT = (1 << 11); // must be larger than 2 * n
 constexpr int FINGERPRINT_HASH_LINE = 10 * m;
 typedef std::vector<long long> fingerprint_hash;
 
