@@ -1,9 +1,11 @@
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cmath>
 #include <ctime>
 #include <immintrin.h>
 #include <map>
+#include <pthread.h>
 
 #include "PRNG/prng.h"
 #include "crypto.h"
@@ -175,17 +177,41 @@ fingerprint_hash to_hash(const fingerprint& F)
     return H;
 }
 
+const long long TIMING_THRESHOLD = 1000;
+volatile bool race = false;
+std::atomic<bool> t = true;
+void* add(void* /*unused*/)
+{
+    while (t)
+        race = !race;
+    return NULL;
+}
+
 /*
  * Generates the fingerprint (by timing fp_func repeatedly) and returns
  * it as a fingerprint_hash.
  */
 fingerprint_hash make_hash(const std::function<size_t(size_t)>& fp_func)
 {
+    pthread_t tid;
+    pthread_create(&tid, NULL, add, NULL);
+    int violations = 0, tests = 0;
+
     fingerprint F;
     for (int i = 1; i <= m; i++) {
         for (int j = 1; j <= n; j++) {
             struct timespec startTime, endTime;
             uint64_t startTSC, endTSC;
+
+            if (!race) {
+                _clock_gettime(CLOCK_REALTIME, &startTime);
+                _clock_gettime(CLOCK_REALTIME, &endTime);
+
+                long long delta = (endTime.tv_sec * 1000000000 + endTime.tv_nsec) - (startTime.tv_sec * 1000000000 + startTime.tv_nsec);
+                violations += (delta > TIMING_THRESHOLD);
+                tests += 1;
+            }
+
             _clock_gettime(CLOCK_REALTIME, &startTime);
             fp_func(j);
             _clock_gettime(CLOCK_REALTIME, &endTime);
@@ -202,8 +228,25 @@ fingerprint_hash make_hash(const std::function<size_t(size_t)>& fp_func)
                 logTime = sensitivity * (endTime.tv_nsec - startTime.tv_nsec) / (endTSC - startTSC);
             else if (CLOCKSOURCE == HPET)
                 logTime = endTime.tv_nsec - startTime.tv_nsec;
+
+            if (race) {
+                _clock_gettime(CLOCK_REALTIME, &startTime);
+                for (volatile int i = 1000; i > 0; i--)
+                    ;
+                _clock_gettime(CLOCK_REALTIME, &endTime);
+
+                long long delta = (endTime.tv_sec * 1000000000 + endTime.tv_nsec) - (startTime.tv_sec * 1000000000 + startTime.tv_nsec);
+                violations += (delta < TIMING_THRESHOLD);
+                tests += 1;
+            }
             F[j - 1][i - 1] = logTime;
         }
+    }
+    t = false;
+    pthread_join(tid, NULL);
+    if (1.0 * violations > 0.1 * tests) {
+        printf("Attack!\n");
+        exit(0);
     }
 
     fingerprint_hash H = to_hash(F);
