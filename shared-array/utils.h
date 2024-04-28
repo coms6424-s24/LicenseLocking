@@ -9,6 +9,6 @@ constexpr int n = 1000;
 constexpr int m = 50;
 
 void set_cpu(int cpu_id);
-void set_thread_cpu(pthread_t thread, int cpu_id);
+void set_thread_cpu(pthread_t thread,int cpu_id);
 
 #endif
