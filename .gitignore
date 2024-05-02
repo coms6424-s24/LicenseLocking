@@ -1,1 +1,3 @@
 .DS_Store
+testing/env/*
+testing/server-1-keypair.pem
