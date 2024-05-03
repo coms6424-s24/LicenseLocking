@@ -5,10 +5,11 @@ import time
 from scp import SCPClient
 
 aws_vms = [
-	"ec2-52-14-168-126.us-east-2.compute.amazonaws.com"
+	"ec2-3-135-216-61.us-east-2.compute.amazonaws.com",
+	"ec2-3-17-74-69.us-east-2.compute.amazonaws.com"
 ]
 
-test_count = 100
+test_count = 10
 
 #############################################
 ####		 SSH Helper Methods			 ####
@@ -39,13 +40,15 @@ def scp_send_file(client, file_path):
 def initialize_clients():
 	for i in range(len(aws_vms)):
 		client = create_ssh_client(aws_vms[i], "ubuntu", "server-1-keypair.pem")
-		stdin, stdout, stderr = client.exec_command("ls LicenseLocking-main/cryptofp-cpp/main")
+		stdin, stdout, stderr = client.exec_command("ls LicenseLocking/cryptofp-cpp/main")
 		ls_result = stderr.readlines()
 
 		if (len(ls_result) > 0):
 			scp_send_file(client, "LicenseLocking-main.zip")
 			client.exec_command("unzip LicenseLocking-main.zip")
-			stdin, stdout, stderr = client.exec_command("cd LicenseLocking-main/cryptofp-cpp && ./build.sh && make")
+			stdin, stdout, stderr = client.exec_command("cd LicenseLocking/cryptofp-cpp && ./build.sh && make")
+			print(stdout.readlines())
+			print(stderr.readlines())
 			print("Built LicenseLocking package for machine " + str(i))
 		else:
 			print("LicenseLocking package was already initialized for machine " + str(i))
@@ -54,15 +57,42 @@ def initialize_clients():
 
 
 def generate_fingerprints():
-	return
+	for i in range(len(aws_vms)):
+		client = create_ssh_client(aws_vms[i], "ubuntu", "server-1-keypair.pem")
+		fp_path = "~/fp-" + str(i)
+		command_string = "cd LicenseLocking/cryptofp-cpp && sudo ./select_timer.sh hpet && ./main " + fp_path;
+		stdin, stdout, stderr = client.exec_command(command_string)
+
+		print("Generated fingerprint for machine " + str(i))
+
+		client.close()
 
 
 def download_fingerprints():
-	return
+	for i in range(len(aws_vms)):
+		client = create_ssh_client(aws_vms[i], "ubuntu", "server-1-keypair.pem")
+		fp_path = "~/fp-" + str(i)
+		scp_retrieve_file(client, fp_path)
+
+		print("Downloaded fingerprint for machine " + str(i))
+
+		client.close()
 
 
 def upload_fingerprints():
-	return
+	for client_num in range(len(aws_vms)):
+		client = create_ssh_client(aws_vms[client_num], "ubuntu", "server-1-keypair.pem")
+		client.exec_command("mkdir LicenseLocking/cryptofp-cpp/test_fps")
+
+		for fp_num in range(len(aws_vms)):
+			fp_string = "fp-" + str(fp_num)
+			scp_send_file(client, "./" + fp_string)
+			client.exec_command("mv " + fp_string + " LicenseLocking/cryptofp-cpp/test_fps")
+
+			print("Uploaded fingerprint " + str(fp_num) + " to machine " + str(client_num))
+
+		client.close()
+
 
 
 def run_test_loop():
@@ -72,15 +102,18 @@ def run_test_loop():
 		client = create_ssh_client(aws_vms[client_num], "ubuntu", "server-1-keypair.pem")
 
 		for fp_num in range(len(aws_vms)):
-			fp_path = "~/test_fps/fp-" + str(fp_num)
+			fp_path = "test_fps/fp-" + str(fp_num)
 			test_param = "--test_count=" + str(test_count)
-			command_string = "cd LicenseLocking-main/cryptofp-cpp && ./taskset_test.sh --fp=" + fp_path + " " + test_param + " --stress=0"
+			command_string = "cd LicenseLocking/cryptofp-cpp && ./taskset_test.sh --fp=" + fp_path + " " + test_param + " --stress=0"
 			stdin, stdout, stderr = client.exec_command(command_string)
 			cmd_output = stdout.readline()
 
 			m = re.match(r'cpu 0: (\d+)/(\d+)', cmd_output)
 			fail_count = m.group(1)
-			results[i][j] = test_count - fail_count
+			pass_count = test_count - int(fail_count)
+			results[client_num][fp_num] = pass_count
+
+			print("Testing fingerprint " + str(fp_num) + " on machine " + str(client_num) + " with results: " + str(pass_count) + "/" + str(test_count))
 
 		client.close()
 
@@ -91,48 +124,15 @@ def run_test_loop():
 ####		   Main Execution			 ####
 #############################################
 def main():
-	# initialize_clients()
-	# generate_fingerprints()
-	# download_fingerprints()
-	# upload_fingerprints()
-	#results = run_test_loop()
-
-
-	client = create_ssh_client("ec2-52-14-168-126.us-east-2.compute.amazonaws.com", "ubuntu", "server-1-keypair.pem")
-	#stdin, stdout, stderr = client.exec_command("cd LicenseLocking-main/cryptofp-cpp && sudo ./select_timer.sh hpet && ./main fingerprints/aws-fp-dec1 -cmp")
-	stdin, stdout, stderr = client.exec_command("cd LicenseLocking-main-old/cryptofp-cpp && ./taskset_test.sh --fp=fingerprints/aws-fp-dec1 --test_count=1 --stress=0")
-	res = stdout.readline()
-	m = re.match(r'cpu 0: (\d+)/(\d+)', res)
-
-	print(m.group(1))
-	client.close()
-
-	
-
+	initialize_clients()
+	generate_fingerprints()
+	time.sleep(1)
+	download_fingerprints()
+	upload_fingerprints()
+	results = run_test_loop()
+	print(results)
 
 if __name__ == '__main__':
 	main()
-
-
-
-
-
-def invoke_ssh(client):
-	# channel = client.invoke_shell()
-	# stdin = channel.makefile('wb')
-	# stdout = channel.makefile('rb')
-
-	# stdin.write('''
-	# cd LicenseLocking-main/cryptofp-cpp
-	# ./main fingerprints/aws-fp-dec1 -cmp
-	# exit
-	# ''')
-	# print(stdout.readlines())
-
-	# stdout.close()
-	# stdin.close()
-	# client.close()
-	return
-
 
 

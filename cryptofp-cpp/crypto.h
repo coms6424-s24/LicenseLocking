@@ -2,7 +2,7 @@
 #include <gmp.h>
 
 // for testing purposes
-constexpr bool ENCRYPT = true;
+constexpr bool ENCRYPT = false;
 
 extern "C" {
 /*
