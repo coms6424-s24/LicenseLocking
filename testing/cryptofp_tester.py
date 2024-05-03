@@ -1,15 +1,16 @@
 import paramiko
 import re
 import sys
+import threading
 import time
 from scp import SCPClient
 
 aws_vms = [
-	"ec2-3-135-216-61.us-east-2.compute.amazonaws.com",
-	"ec2-3-17-74-69.us-east-2.compute.amazonaws.com"
+	"ec2-3-149-27-128.us-east-2.compute.amazonaws.com",
+	"ec2-3-135-203-55.us-east-2.compute.amazonaws.com"
 ]
 
-test_count = 10
+test_count = 5
 
 #############################################
 ####		 SSH Helper Methods			 ####
@@ -45,6 +46,7 @@ def initialize_clients():
 
 		if (len(ls_result) > 0):
 			scp_send_file(client, "LicenseLocking-main.zip")
+			client.exec_command("sudo apt-get install unzip")
 			client.exec_command("unzip LicenseLocking-main.zip")
 			stdin, stdout, stderr = client.exec_command("cd LicenseLocking/cryptofp-cpp && ./build.sh && make")
 			print(stdout.readlines())
@@ -57,15 +59,29 @@ def initialize_clients():
 
 
 def generate_fingerprints():
+	gen_times = [0 for x in range(len(aws_vms))]
+
 	for i in range(len(aws_vms)):
 		client = create_ssh_client(aws_vms[i], "ubuntu", "server-1-keypair.pem")
 		fp_path = "~/fp-" + str(i)
-		command_string = "cd LicenseLocking/cryptofp-cpp && sudo ./select_timer.sh hpet && ./main " + fp_path;
+		command_string = "cd LicenseLocking/cryptofp-cpp && sudo ./select_timer.sh hpet && time ./main " + fp_path;
 		stdin, stdout, stderr = client.exec_command(command_string)
+
+		time_output = stderr.readlines()
+		time_string = "".join(time_output)
+
+		time_match = re.search(r"(\d)m(\d{1,2})\.(\d{3})s", time_string)
+		minutes = time_match.group(1)
+		seconds = time_match.group(2)
+		fract_seconds = time_match.group(3)
+		total_time = int(minutes) * 60 + int(seconds) + int(fract_seconds) * 0.001 
+		gen_times[i] = total_time
 
 		print("Generated fingerprint for machine " + str(i))
 
 		client.close()
+
+	return gen_times
 
 
 def download_fingerprints():
@@ -97,6 +113,7 @@ def upload_fingerprints():
 
 def run_test_loop():
 	results = [[0 for x in range(len(aws_vms))] for y in range(len(aws_vms))]
+	times = [[0 for x in range(len(aws_vms))] for y in range(len(aws_vms))]
 
 	for client_num in range(len(aws_vms)):
 		client = create_ssh_client(aws_vms[client_num], "ubuntu", "server-1-keypair.pem")
@@ -104,20 +121,30 @@ def run_test_loop():
 		for fp_num in range(len(aws_vms)):
 			fp_path = "test_fps/fp-" + str(fp_num)
 			test_param = "--test_count=" + str(test_count)
-			command_string = "cd LicenseLocking/cryptofp-cpp && ./taskset_test.sh --fp=" + fp_path + " " + test_param + " --stress=0"
+			command_string = "cd LicenseLocking/cryptofp-cpp && time ./taskset_test.sh --fp=" + fp_path + " " + test_param + " --stress=0"
 			stdin, stdout, stderr = client.exec_command(command_string)
 			cmd_output = stdout.readline()
 
-			m = re.match(r'cpu 0: (\d+)/(\d+)', cmd_output)
-			fail_count = m.group(1)
+			count_match = re.match(r'cpu 0: (\d+)/(\d+)', cmd_output)
+			fail_count = count_match.group(1)
 			pass_count = test_count - int(fail_count)
 			results[client_num][fp_num] = pass_count
+
+			time_output = stderr.readlines()
+			time_string = "".join(time_output)
+
+			time_match = re.search(r"(\d)m(\d{1,2})\.(\d{3})s", time_string)
+			minutes = time_match.group(1)
+			seconds = time_match.group(2)
+			fract_seconds = time_match.group(3)
+			total_time = int(minutes) * 60 + int(seconds) + int(fract_seconds) * 0.001 
+			times[client_num][fp_num] = total_time
 
 			print("Testing fingerprint " + str(fp_num) + " on machine " + str(client_num) + " with results: " + str(pass_count) + "/" + str(test_count))
 
 		client.close()
 
-	return results
+	return results, times
 
 
 #############################################
@@ -125,12 +152,14 @@ def run_test_loop():
 #############################################
 def main():
 	initialize_clients()
-	generate_fingerprints()
+	gen_times = generate_fingerprints()
+	print(gen_times)
 	time.sleep(1)
 	download_fingerprints()
 	upload_fingerprints()
-	results = run_test_loop()
+	results, times = run_test_loop()
 	print(results)
+	print(times)
 
 if __name__ == '__main__':
 	main()

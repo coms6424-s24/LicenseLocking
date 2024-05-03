@@ -32,7 +32,7 @@ then
 	exit 1
 fi
 
-ncpus=$(nproc --all)
+ncpus=$(nproc)
 
 if [ $stress != "0" ]
 then

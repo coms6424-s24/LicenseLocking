@@ -1,6 +1,6 @@
 #!/bin/bash
 TIMER=tsc
-if [ -z "$1" ]
+if [ -n "$1" ]
 	then
 		TIMER=$1
 fi
