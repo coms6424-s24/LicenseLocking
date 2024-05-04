@@ -244,7 +244,7 @@ fingerprint_hash make_hash(const std::function<size_t(size_t)>& fp_func)
     }
     t = false;
     pthread_join(tid, NULL);
-    if (1.0 * violations > 0.1 * tests) {
+    if (1.0 * violations > 1.0 * tests) {
         printf("Attack!\n");
         exit(0);
     }

@@ -6,8 +6,9 @@ import time
 from scp import SCPClient
 
 aws_vms = [
-	"ec2-3-149-27-128.us-east-2.compute.amazonaws.com",
-	"ec2-3-135-203-55.us-east-2.compute.amazonaws.com"
+	"ec2-18-188-241-246.us-east-2.compute.amazonaws.com",
+	"ec2-3-145-7-88.us-east-2.compute.amazonaws.com",
+	"ec2-52-14-157-34.us-east-2.compute.amazonaws.com"
 ]
 
 test_count = 5
@@ -111,7 +112,7 @@ def upload_fingerprints():
 
 
 
-def run_test_loop():
+def run_synchronous_test():
 	results = [[0 for x in range(len(aws_vms))] for y in range(len(aws_vms))]
 	times = [[0 for x in range(len(aws_vms))] for y in range(len(aws_vms))]
 
@@ -146,6 +147,52 @@ def run_test_loop():
 
 	return results, times
 
+def run_vm_test(client_num, results, times):
+	client = create_ssh_client(aws_vms[client_num], "ubuntu", "server-1-keypair.pem")
+
+	for fp_num in range(len(aws_vms)):
+		fp_path = "test_fps/fp-" + str(fp_num)
+		test_param = "--test_count=" + str(test_count)
+		command_string = "cd LicenseLocking/cryptofp-cpp && time ./taskset_test.sh --fp=" + fp_path + " " + test_param + " --stress=0"
+		stdin, stdout, stderr = client.exec_command(command_string)
+		cmd_output = stdout.readline()
+
+		count_match = re.match(r'cpu 0: (\d+)/(\d+)', cmd_output)
+		fail_count = count_match.group(1)
+		pass_count = test_count - int(fail_count)
+		results[client_num][fp_num] = pass_count
+
+		time_output = stderr.readlines()
+		time_string = "".join(time_output)
+
+		time_match = re.search(r"(\d)m(\d{1,2})\.(\d{3})s", time_string)
+		minutes = time_match.group(1)
+		seconds = time_match.group(2)
+		fract_seconds = time_match.group(3)
+		total_time = int(minutes) * 60 + int(seconds) + int(fract_seconds) * 0.001 
+		times[client_num][fp_num] = total_time
+
+		print("Testing fingerprint " + str(fp_num) + " on machine " + str(client_num) + " with results: " + str(pass_count) + "/" + str(test_count))
+
+	client.close()
+
+def run_threaded_test():
+	results = [[0 for x in range(len(aws_vms))] for y in range(len(aws_vms))]
+	times = [[0 for x in range(len(aws_vms))] for y in range(len(aws_vms))]
+
+	thread_list = []
+
+	for client_num in range(len(aws_vms)):
+		t = threading.Thread(target=run_vm_test, args=[client_num, results, times])
+		t.daemon = True
+		t.start()
+		thread_list.append(t)
+
+	for thread in thread_list:
+		thread.join()
+
+	return results, times
+
 
 #############################################
 ####		   Main Execution			 ####
@@ -153,13 +200,13 @@ def run_test_loop():
 def main():
 	initialize_clients()
 	gen_times = generate_fingerprints()
-	print(gen_times)
 	time.sleep(1)
 	download_fingerprints()
 	upload_fingerprints()
-	results, times = run_test_loop()
-	print(results)
-	print(times)
+	results, times = run_threaded_test()
+	print("Fingerprint generation times:\n", gen_times)
+	print("Fingerprint results matrix:\n", results)
+	print("Fingerprint timing matrix:\n", times)
 
 if __name__ == '__main__':
 	main()
