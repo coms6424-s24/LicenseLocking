@@ -2,7 +2,11 @@
 
 ## Paper
 
-https://www.s3.eurecom.fr/docs/ccs18_iskander.pdf
+Our final 8-page research paper in ACM double-column format is located [here](LicenseLocking.pdf).
+
+Over the course of this research we have also written up  our findings regarding how system clocks interact with the Unix kernel and have compiled all of the key sections of kernel code to help explain the different interactions with the timers such as the TSC and HPET.  We have included this information as an appendix in a second copy of our research paper, which can be found [here](LicenseLocking_with_appendix.pdf).
+
+Our research was based off of the CryptoFP fingerprinting method developed by Sanchez-Rola et. al in 2018: https://www.s3.eurecom.fr/docs/ccs18_iskander.pdf
 
 ## Building and Example Usage
 To build and run the fingerprinting program, run
