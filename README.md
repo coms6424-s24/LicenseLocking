@@ -97,4 +97,8 @@ cpu 11: 0/1000 failed
 ```
 reveals that our fingerprinting method remains stable even at extreme loads. It is also a great way to drain your laptop battery.
 
-GCP testing will be included here soon.
+An example of our output returned from our full AWS EC2 test suite is included below.  Note the high stability rate of over 96.3% and the collision rate of 0%, indicating that our fingerprinting algorithm has 100% discrimination power and provides a strong basis for license locking.
+
+![testing-output](testing/test-output.png)
+
+
